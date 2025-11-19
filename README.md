@@ -17,5 +17,21 @@ oh, sorry, I forgor
 pip install -r requirements.txt
 ```
 ## Some results on default settings
-![img.png](assets/img.png)
+### Fully random data
+![img.png](assets/img_random.png)
+
+### Sorted data
+![img_best_case.png](assets/img_best_case.png)
+
+### Reversed data
+![img_worst_case.png](assets/img_worst_case.png)
+
+### Data with jumps
+![img_jumps.png](assets/img_jumps.png)
+
+### Data with alternating values
+![img_alternating.png](assets/img_alternating.png)
+
+### Data with many unique values
+![img_many_unique.png](assets/img_many_unique.png)
 

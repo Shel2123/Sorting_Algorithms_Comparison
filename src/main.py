@@ -1,9 +1,12 @@
 from random import randint as rd
+import random
 import time
 import sys
 from concurrent.futures import ProcessPoolExecutor
-sys.setrecursionlimit(10**7)
 from src.ips4 import sort_parallel
+import matplotlib.pyplot as plt
+
+sys.setrecursionlimit(10**7)
 
 def powersort(a):
     n = len(a)
@@ -119,7 +122,6 @@ def powersort(a):
 
     return a
 
-
 def radix_sort(a):
     n = len(a)
     if n <= 1:
@@ -149,7 +151,6 @@ def radix_sort(a):
 
     return a
 
-
 def insertion_sort(arr):
     n = len(arr)
     for i in range(1, n):
@@ -160,7 +161,6 @@ def insertion_sort(arr):
             j -= 1
         arr[j + 1] = x
     return arr
-
 
 def bucketish_sort(lst, factor=4):
     n = len(lst)
@@ -204,7 +204,6 @@ def bucketish_sort(lst, factor=4):
         out.extend(b)
 
     return out
-
 
 def merge_sort(arr):
     n = len(arr)
@@ -252,6 +251,8 @@ def default_sort(arr):
 
 def measure(sort_fn, base_arr, reps=3):
     best = float('inf')
+    if len(base_arr) <= 1:
+        return 0.0
     for _ in range(reps):
         arr = base_arr.copy()
         start = time.perf_counter()
@@ -272,16 +273,7 @@ def bench_one_n(args):
 
     return n, t_radix, t_bucket, t_power, t_merge, t_ips4, t_default
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
-    sizes = list(range(0, 100_000, 10_000))
-
-    tasks = []
-    for n in sizes:
-        base_arr = [rd(1, 10_000_000) for _ in range(n)]
-        tasks.append((n, base_arr))
-
+def run_bench(tasks):
     times_radix = []
     times_bucket = []
     times_power = []
@@ -298,16 +290,252 @@ if __name__ == "__main__":
             times_ips.append(t_ips)
             times_default.append(t_default)
 
+    return times_radix, times_bucket, times_power, times_merge, times_ips, times_default
+
+def trend_with_jumps(n, jump_prob=0.05):
+    arr = []
+    value = 1
+    for _ in range(n):
+        if random.random() < jump_prob:
+            value += rd(-10, 10)
+        else:
+            value += rd(0, 1)
+
+        if value < 1:
+            value = 1
+
+        arr.append(value)
+
+    return arr
+
+def worst_case(n):
+    return list(range(n, 0, -1))
+
+def best_case(n):
+    return list(range(n))
+
+def worst_case_alternating_high_low(n):
+    high = list(range(n, 0, -1))
+    low = list(range(1, n + 1))
+    arr = []
+    for h, l in zip(high, low):
+        arr.append(h)
+        arr.append(l)
+    return arr[:n]
+
+def generate_many_duplicates(n, distinct_values=3, max_value=20):
+    base_values = random.sample(range(1, max_value + 1), k=distinct_values)
+    return [random.choice(base_values) for _ in range(n)]
+
+
+def generate_many_unique_spread(n, range_multiplier=1000):
+    """
+    range_multiplier - "range" of values will be n * range_multiplier
+    """
+    max_value = n * range_multiplier
+    arr = random.sample(range(1, max_value + 1), n)
+    return arr
+
+
+def plot_results(sizes, series, title):
+    """
+    sizes - list of array sizes
+    series - list of tuples (label, values), where values is a list of times corresponding to sizes
+    title  - title of the plot
+    """
     plt.figure(figsize=(10, 6))
-    plt.plot(sizes, times_radix,  label="radix_sort")
-    plt.plot(sizes, times_bucket, label="bucketish_sort")
-    plt.plot(sizes, times_power,  label="power_sort")
-    plt.plot(sizes, times_merge,  label="merge_sort")
-    plt.plot(sizes, times_ips, label="ips4o")
-    plt.plot(sizes, times_default, label=".sort()")
+    for label, values in series:
+        plt.plot(sizes, values, label=label)
+
+    plt.title(title)
     plt.xlabel("Array size")
-    plt.ylabel("Time in sec")
+    plt.ylabel("Time, sec")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+
+
+if __name__ == "__main__":
+    sizes = list(range(1, 1_000_000, 100_000))
+
+    tasks_random = []
+    for n in sizes:
+        base_arr = [rd(1, 10_000_000) for _ in range(n)]
+        tasks_random.append((n, base_arr))
+
+    (times_radix_rand,
+     times_bucket_rand,
+     times_power_rand,
+     times_merge_rand,
+     times_ips_rand,
+     times_default_rand) = run_bench(tasks_random)
+
+    plot_results(
+        sizes,
+        [
+            ("radix_sort",   times_radix_rand),
+            ("bucketish_sort", times_bucket_rand),
+            ("power_sort",   times_power_rand),
+            ("merge_sort",   times_merge_rand),
+            ("ips4o",        times_ips_rand),
+            (".sort()",      times_default_rand),
+        ],
+        "Random data sorting comparison",
+    )
+
+    tasks_jumps = []
+    for n in sizes:
+        base_arr = trend_with_jumps(n, jump_prob=0.05)
+        tasks_jumps.append((n, base_arr))
+
+    (times_radix_jump,
+     times_bucket_jump,
+     times_power_jump,
+     times_merge_jump,
+     times_ips_jump,
+     times_default_jump) = run_bench(tasks_jumps)
+
+    plot_results(
+        sizes,
+        [
+            ("radix_sort",   times_radix_jump),
+            ("bucketish_sort", times_bucket_jump),
+            ("power_sort",   times_power_jump),
+            ("merge_sort",   times_merge_jump),
+            ("ips4o",        times_ips_jump),
+            (".sort()",      times_default_jump),
+        ],
+        "Data with jumps sorting comparison",
+    )
+
+    tasks_best = []
+    for n in sizes:
+        base_arr = best_case(n)
+        tasks_best.append((n, base_arr))
+
+    (times_radix_best,
+     times_bucket_best,
+     times_power_best,
+     times_merge_best,
+     times_ips_best,
+     times_default_best) = run_bench(tasks_best)
+
+    plot_results(
+        sizes,
+        [
+            ("radix_sort", times_radix_best),
+            ("bucketish_sort", times_bucket_best),
+            ("power_sort", times_power_best),
+            ("merge_sort", times_merge_best),
+            ("ips4o", times_ips_best),
+            (".sort()", times_default_best),
+        ],
+        "Best-case data sorting comparison",
+    )
+
+    tasks_worst = []
+    for n in sizes:
+        base_arr = worst_case(n)
+        tasks_worst.append((n, base_arr))
+
+    (times_radix_worst,
+     times_bucket_worst,
+     times_power_worst,
+     times_merge_worst,
+     times_ips_worst,
+     times_default_worst) = run_bench(tasks_worst)
+
+    plot_results(
+        sizes,
+        [
+            ("radix_sort",   times_radix_worst),
+            ("bucketish_sort", times_bucket_worst),
+            ("power_sort",   times_power_worst),
+            ("merge_sort",   times_merge_worst),
+            ("ips4o",        times_ips_worst),
+            (".sort()",      times_default_worst),
+        ],
+        "Worst-case data sorting comparison",
+    )
+
+    tasks_alternating = []
+    for n in sizes:
+        base_arr = worst_case_alternating_high_low(n)
+        tasks_alternating.append((n, base_arr))
+
+    (times_radix_alternating,
+     times_bucket_alternating,
+     times_power_alternating,
+     times_merge_alternating,
+     times_ips_alternating,
+     times_default_alternating) = run_bench(tasks_alternating)
+
+    plot_results(
+        sizes,
+        [
+            ("radix_sort", times_radix_alternating),
+            ("bucketish_sort", times_bucket_alternating),
+            ("power_sort", times_power_alternating),
+            ("merge_sort", times_merge_alternating),
+            ("ips4o", times_ips_alternating),
+            (".sort()", times_default_alternating),
+        ],
+        "Alternating-case data sorting comparison",
+    )
+    # task_duplicates = []
+    # for n in sizes:
+    #     base_arr = generate_many_duplicates(n, distinct_values=3, max_value=20)
+    #     print(base_arr)
+    #     task_duplicates.append((n, base_arr))
+    #
+    # print("Starting benchmark for many duplicates data...")
+    #
+    # (times_radix_duplicates,
+    #  times_bucket_duplicates,
+    #  times_power_duplicates,
+    #  times_merge_duplicates,
+    #  times_ips_duplicates,
+    #  times_default_duplicates) = run_bench(task_duplicates)
+    #
+    # print("Benchmark for many duplicates data completed.")
+    #
+    # plot_results(
+    #     sizes,
+    #     [
+    #         ("radix_sort", times_radix_duplicates),
+    #         ("bucketish_sort", times_bucket_duplicates),
+    #         ("power_sort", times_power_duplicates),
+    #         ("merge_sort", times_merge_duplicates),
+    #         ("ips4o", times_ips_duplicates),
+    #         (".sort()", times_default_duplicates),
+    #     ],
+    #     "Many Duplicates Data Sorting Comparison",
+    # )
+
+
+    task_unique_spread = []
+    for n in sizes:
+        base_arr = generate_many_unique_spread(n, range_multiplier=1000)
+        task_unique_spread.append((n, base_arr))
+
+    (times_radix_unique,
+     times_bucket_unique,
+     times_power_unique,
+     times_merge_unique,
+     times_ips_unique,
+     times_default_unique) = run_bench(task_unique_spread)
+
+    plot_results(
+        sizes,
+        [
+            ("radix_sort", times_radix_unique),
+            ("bucketish_sort", times_bucket_unique),
+            ("power_sort", times_power_unique),
+            ("merge_sort", times_merge_unique),
+            ("ips4o", times_ips_unique),
+            (".sort()", times_default_unique),
+        ],
+        "Many Unique Spread Data Sorting Comparison",
+    )
